@@ -523,7 +523,7 @@
     const img = new Image();
     const objectUrl = URL.createObjectURL(file);
     img.onload = function() {
-      const MAX = 800;
+      const MAX = 350;
       let w = img.width, h = img.height;
       if (w > MAX || h > MAX) {
         if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
@@ -532,7 +532,7 @@
       const canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      currentImageData = canvas.toDataURL('image/jpeg', 0.65);
+      currentImageData = canvas.toDataURL('image/jpeg', 0.4);
       URL.revokeObjectURL(objectUrl);
       previewImg.src = currentImageData;
       startSection.style.display = 'none';
