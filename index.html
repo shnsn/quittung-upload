@@ -247,22 +247,7 @@
     transition: color 0.15s ease;
   }
 
-  #file-input, #scan-input { display: none; }
-
-  .action-btns {
-    display: flex;
-    gap: 16px;
-    justify-content: center;
-  }
-
-  .camera-btn.scan-btn {
-    width: 120px;
-    height: 120px;
-  }
-
-  .camera-btn.scan-btn .camera-icon {
-    font-size: 36px;
-  }
+  #file-input { display: none; }
 
   .hint {
     font-size: 13px;
@@ -428,19 +413,12 @@
   <div class="body">
 
     <div id="start-section">
-      <div class="action-btns">
-        <button class="camera-btn" onclick="document.getElementById('file-input').click()">
-          <span class="camera-icon">📷</span>
-          <span class="camera-label">FOTO</span>
-        </button>
-        <button class="camera-btn scan-btn" onclick="document.getElementById('scan-input').click()">
-          <span class="camera-icon">🔍</span>
-          <span class="camera-label">SCANNEN</span>
-        </button>
-      </div>
+      <button class="camera-btn" onclick="document.getElementById('file-input').click()">
+        <span class="camera-icon">📷</span>
+        <span class="camera-label">FOTOGRAFIEREN</span>
+      </button>
       <input type="file" id="file-input" accept="image/*" capture="environment">
-      <input type="file" id="scan-input" accept="image/*">
-      <p class="hint">Foto: direkt mit der Kamera. Scannen: Dokument-Scanner oder Galerie auswählen.</p>
+      <p class="hint">Kamera auf die Quittung richten — iOS erkennt das Dokument automatisch und rahmt es ein.</p>
     </div>
 
     <div id="preview-section">
@@ -525,7 +503,7 @@
   let currentTimestamp = '';
 
   const fileInput      = document.getElementById('file-input');
-  const scanInput      = document.getElementById('scan-input');
+
   const startSection   = document.getElementById('start-section');
   const previewSection = document.getElementById('preview-section');
   const statusSection  = document.getElementById('status-section');
@@ -566,10 +544,6 @@
   fileInput.addEventListener('change', function(e) {
     handleFile(e.target.files[0]);
     fileInput.value = '';
-  });
-  scanInput.addEventListener('change', function(e) {
-    handleFile(e.target.files[0]);
-    scanInput.value = '';
   });
 
   async function sendPhoto() {
