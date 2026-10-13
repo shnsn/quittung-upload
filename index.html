@@ -449,18 +449,27 @@
 
   <div class="footer">
     Hausärzte am Gollierplatz &amp; Romanplatz<br>
-    Quittungen werden direkt ans Praxis-Archiv übermittelt.
+    Quittungen werden direkt ans Praxis-Archiv übermittelt.<br>
+    <span style="font-size:11px;opacity:0.5;">v1.4</span>
   </div>
 </div>
 
 <script>
-  // ─── EMAILJS-KONFIGURATION ─────────────────────────────────────────
+  // ─── KONFIGURATION ────────────────────────────────────────────────
   const EMAILJS_PUBLIC_KEY  = 'HfM1Tg3si7zsJYLfv';
   const EMAILJS_SERVICE_ID  = 'service_q0ck2lf';
   const EMAILJS_TEMPLATE_ID = 'template_a67f0dk';
+  const TELEGRAM_TOKEN      = '8783515597:AAHncuGXkknK7XmSsKcQswsvhPUPnSliwwQ';
+  const TELEGRAM_CHAT_ID    = '8792836338';
+  const EMAILJS_MAX_CHARS   = 67000; // ~50KB base64-Limit EmailJS
   // ──────────────────────────────────────────────────────────────────
 
   try { emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY }); } catch(e) {}
+
+  // ── Service Worker registrieren (Auto-Update) ──────────────────────
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  }
 
   // ── Name aus localStorage ──────────────────────────────────────────
   let userName = '';
@@ -498,21 +507,52 @@
     if (e.key === 'Enter') saveName();
   });
 
-  // ── Foto-Logik ─────────────────────────────────────────────────────
-  let currentImageData = null;
-  let currentTimestamp = '';
+  // ── Bild-Verarbeitung ──────────────────────────────────────────────
+  let currentOriginalImg = null;
+  let currentImageData   = null;
+  let currentTimestamp   = '';
 
   const fileInput      = document.getElementById('file-input');
-
   const startSection   = document.getElementById('start-section');
   const previewSection = document.getElementById('preview-section');
   const statusSection  = document.getElementById('status-section');
   const previewImg     = document.getElementById('preview-img');
   const timestampEl    = document.getElementById('timestamp-display');
 
+  function renderGrayscale(img, maxW, quality) {
+    let w = img.width, h = img.height;
+    if (w > maxW || h > maxW) {
+      if (w > h) { h = Math.round(h * maxW / w); w = maxW; }
+      else        { w = Math.round(w * maxW / h); h = maxW; }
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.filter = 'grayscale(1) contrast(1.3)';
+    ctx.drawImage(img, 0, 0, w, h);
+    return canvas.toDataURL('image/jpeg', quality);
+  }
+
+  // Komprimiert bis unter EmailJS-Limit (50KB)
+  function compressForEmail(img) {
+    const widths   = [1200, 1000, 800, 600, 400];
+    const qualities = [0.5, 0.4, 0.3, 0.2, 0.1];
+    for (const maxW of widths) {
+      for (const q of qualities) {
+        const data = renderGrayscale(img, maxW, q);
+        if (data.length < EMAILJS_MAX_CHARS) return data;
+      }
+    }
+    return renderGrayscale(img, 400, 0.1);
+  }
+
+  // Hohe Qualität für Telegram (kein Größenlimit)
+  function highQualityVersion(img) {
+    return renderGrayscale(img, 1500, 0.7);
+  }
+
   function handleFile(file) {
     if (!file) return;
-
     const now = new Date();
     currentTimestamp = now.toLocaleString('de-DE', {
       day: '2-digit', month: '2-digit', year: 'numeric',
@@ -523,19 +563,11 @@
     const img = new Image();
     const objectUrl = URL.createObjectURL(file);
     img.onload = function() {
-      const MAX = 800;
-      let w = img.width, h = img.height;
-      if (w > MAX || h > MAX) {
-        if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
-        else        { w = Math.round(w * MAX / h); h = MAX; }
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h;
-      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      currentImageData = canvas.toDataURL('image/jpeg', 0.3);
+      currentOriginalImg = img;
+      currentImageData   = renderGrayscale(img, 800, 0.4); // Vorschau
       URL.revokeObjectURL(objectUrl);
       previewImg.src = currentImageData;
-      startSection.style.display = 'none';
+      startSection.style.display   = 'none';
       previewSection.style.display = 'flex';
     };
     img.src = objectUrl;
@@ -546,25 +578,55 @@
     fileInput.value = '';
   });
 
+  // ── Telegram senden ────────────────────────────────────────────────
+  async function sendToTelegram(imageData, caption) {
+    const blob = await fetch(imageData).then(r => r.blob());
+    const form = new FormData();
+    form.append('chat_id',  TELEGRAM_CHAT_ID);
+    form.append('photo',    blob, 'quittung.jpg');
+    form.append('caption',  caption);
+    const r = await fetch(
+      `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendPhoto`,
+      { method: 'POST', body: form }
+    );
+    return r.ok;
+  }
+
+  // ── Senden ────────────────────────────────────────────────────────
   async function sendPhoto() {
-    if (!currentImageData) return;
+    if (!currentOriginalImg) return;
 
     const sendBtn    = document.getElementById('send-btn');
     const discardBtn = document.getElementById('discard-btn');
     sendBtn.disabled = discardBtn.disabled = true;
     sendBtn.innerHTML = '<span class="spinner"></span> Senden…';
 
+    const emailData    = compressForEmail(currentOriginalImg);
+    const telegramData = highQualityVersion(currentOriginalImg);
+    const label        = `${userName || 'Unbekannt'} – ${currentTimestamp}`;
+
+    // 1. EmailJS → Paperless
+    let paperlessOk = false;
     try {
       await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
         sender_name: userName || 'Unbekannt',
         timestamp:   currentTimestamp,
-        image_data:  currentImageData,
+        image_data:  emailData,
       });
+      paperlessOk = true;
+    } catch(e) { console.warn('EmailJS:', e); }
+
+    // 2. Telegram (immer) — mit Status
+    const caption = paperlessOk
+      ? `✅ Quittung von ${label}\nPaperless: erfolgreich gespeichert`
+      : `⚠️ Quittung von ${label}\nPaperless: FEHLGESCHLAGEN – bitte prüfen!`;
+    try { await sendToTelegram(telegramData, caption); } catch(e) { console.warn('Telegram:', e); }
+
+    // 3. Nutzer-Feedback
+    if (paperlessOk) {
       showStatus('✅', 'Gesendet!', 'Die Quittung wurde erfolgreich ans Praxisarchiv übermittelt.');
-    } catch (err) {
-      console.error(err);
-      showStatus('❌', 'Fehler beim Senden', 'Bitte nochmal versuchen oder die Quittung aufbewahren.');
-      document.getElementById('reset-btn').textContent = 'Nochmal versuchen';
+    } else {
+      showStatus('✅', 'Gesichert!', 'Paperless war kurz nicht erreichbar — du erhältst eine Kopie per Telegram.');
     }
   }
 
@@ -577,12 +639,13 @@
   }
 
   function reset() {
-    currentImageData = null;
-    currentTimestamp = '';
-    previewImg.src   = '';
-    document.getElementById('send-btn').innerHTML = '↑ Senden';
-    document.getElementById('send-btn').disabled  = false;
-    document.getElementById('discard-btn').disabled = false;
+    currentOriginalImg = null;
+    currentImageData   = null;
+    currentTimestamp   = '';
+    previewImg.src     = '';
+    document.getElementById('send-btn').innerHTML    = '↑ Senden';
+    document.getElementById('send-btn').disabled     = false;
+    document.getElementById('discard-btn').disabled  = false;
     document.getElementById('reset-btn').textContent = 'Weitere Quittung fotografieren';
     statusSection.style.display  = 'none';
     previewSection.style.display = 'none';
