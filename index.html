@@ -450,7 +450,7 @@
   <div class="footer">
     Hausärzte am Gollierplatz &amp; Romanplatz<br>
     Quittungen werden direkt ans Praxis-Archiv übermittelt.<br>
-    <span style="font-size:11px;opacity:0.5;">v1.4</span>
+    <span style="font-size:11px;opacity:0.5;">v1.4.1</span>
   </div>
 </div>
 
@@ -461,7 +461,7 @@
   const EMAILJS_TEMPLATE_ID = 'template_a67f0dk';
   const TELEGRAM_TOKEN      = '8783515597:AAHncuGXkknK7XmSsKcQswsvhPUPnSliwwQ';
   const TELEGRAM_CHAT_ID    = '8792836338';
-  const EMAILJS_MAX_CHARS   = 67000; // ~50KB base64-Limit EmailJS
+  const EMAILJS_MAX_CHARS   = 49000; // EmailJS misst String-Länge, nicht Bytes
   // ──────────────────────────────────────────────────────────────────
 
   try { emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY }); } catch(e) {}

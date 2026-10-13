@@ -1,5 +1,5 @@
 // Service Worker — immer neueste Version laden
-const CACHE = 'quittung-v1.4';
+const CACHE = 'quittung-v1.4.1';
 
 self.addEventListener('install', e => {
   self.skipWaiting(); // sofort aktivieren, nicht auf Tab-Schließen warten
