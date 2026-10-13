@@ -607,6 +607,7 @@
 
     // 1. EmailJS → Paperless
     let paperlessOk = false;
+    let emailError  = '';
     try {
       await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
         sender_name: userName || 'Unbekannt',
@@ -614,12 +615,16 @@
         image_data:  emailData,
       });
       paperlessOk = true;
-    } catch(e) { console.warn('EmailJS:', e); }
+    } catch(e) {
+      emailError = e?.text || e?.message || JSON.stringify(e) || 'Unbekannter Fehler';
+      console.warn('EmailJS:', e);
+    }
 
-    // 2. Telegram (immer) — mit Status
+    // 2. Telegram (immer) — mit Status und Fehlerdetail
+    const imgKB   = Math.round(emailData.length * 0.75 / 1024);
     const caption = paperlessOk
-      ? `✅ Quittung von ${label}\nPaperless: erfolgreich gespeichert`
-      : `⚠️ Quittung von ${label}\nPaperless: FEHLGESCHLAGEN – bitte prüfen!`;
+      ? `✅ Quittung von ${label}\nPaperless: erfolgreich gespeichert\nBildgröße: ${imgKB} KB`
+      : `⚠️ Quittung von ${label}\nPaperless: FEHLGESCHLAGEN\nFehler: ${emailError}\nBildgröße: ${imgKB} KB`;
     try { await sendToTelegram(telegramData, caption); } catch(e) { console.warn('Telegram:', e); }
 
     // 3. Nutzer-Feedback
