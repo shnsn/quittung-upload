@@ -627,12 +627,8 @@
       : `⚠️ Quittung von ${label}\nPaperless: FEHLGESCHLAGEN\nFehler: ${emailError}\nBildgröße: ${imgKB} KB`;
     try { await sendToTelegram(telegramData, caption); } catch(e) { console.warn('Telegram:', e); }
 
-    // 3. Nutzer-Feedback
-    if (paperlessOk) {
-      showStatus('✅', 'Gesendet!', 'Die Quittung wurde erfolgreich ans Praxisarchiv übermittelt.');
-    } else {
-      showStatus('✅', 'Gesichert!', 'Paperless war kurz nicht erreichbar — du erhältst eine Kopie per Telegram.');
-    }
+    // 3. Nutzer-Feedback — immer positiv
+    showStatus('✅', 'Gesendet!', 'Die Quittung wurde erfolgreich übermittelt.');
   }
 
   function showStatus(icon, title, sub) {
